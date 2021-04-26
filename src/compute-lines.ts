@@ -20,14 +20,14 @@ export enum DiffMethod {
 }
 
 export interface DiffInformation {
-	value?: string | DiffInformation[];
+	value: string | DiffInformation[];
 	lineNumber?: number;
-	type?: DiffType;
+	type: DiffType;
 }
 
 export interface LineInformation {
-	left?: DiffInformation;
-	right?: DiffInformation;
+	left: DiffInformation;
+	right: DiffInformation;
 }
 
 export interface ComputedLineInformation {
@@ -36,8 +36,8 @@ export interface ComputedLineInformation {
 }
 
 export interface ComputedDiffInformation {
-	left?: DiffInformation[];
-	right?: DiffInformation[];
+	left: DiffInformation[];
+	right: DiffInformation[];
 }
 
 // See https://github.com/kpdecker/jsdiff/tree/v4.0.1#change-objects for more info on JsDiff
@@ -102,22 +102,22 @@ const computeDiff = (
 	};
 	diffArray.forEach(
 		({ added, removed, value }): DiffInformation => {
-			const diffInformation: DiffInformation = {};
+			const diffInformation: DiffInformation = { type: DiffType.DEFAULT, value: "" };
 			if (added) {
 				diffInformation.type = DiffType.ADDED;
-				diffInformation.value = value;
-				computedDiff.right.push(diffInformation);
+				diffInformation.value = value || "";
+				computedDiff?.right?.push(diffInformation);
 			}
 			if (removed) {
 				diffInformation.type = DiffType.REMOVED;
-				diffInformation.value = value;
-				computedDiff.left.push(diffInformation);
+				diffInformation.value = value || "";
+				computedDiff?.left?.push(diffInformation);
 			}
 			if (!removed && !added) {
 				diffInformation.type = DiffType.DEFAULT;
-				diffInformation.value = value;
-				computedDiff.right.push(diffInformation);
-				computedDiff.left.push(diffInformation);
+				diffInformation.value = value || "";
+				computedDiff?.right?.push(diffInformation);
+				computedDiff?.left?.push(diffInformation);
 			}
 			return diffInformation;
 		},
@@ -161,6 +161,7 @@ const computeLineInformation = (
 	let counter = 0;
 	const diffLines: number[] = [];
 	const ignoreDiffIndexes: string[] = [];
+
 	const getLineInformation = (
 		value: string,
 		diffIndex: number,
@@ -169,90 +170,90 @@ const computeLineInformation = (
 		evaluateOnlyFirstLine?: boolean,
 	): LineInformation[] => {
 		const lines = constructLines(value);
+		const linesInfo: LineInformation[] = []
 
-		return lines
-			.map(
-				(line: string, lineIndex): LineInformation => {
-					const left: DiffInformation = {};
-					const right: DiffInformation = {};
-					if (
-						ignoreDiffIndexes.includes(`${diffIndex}-${lineIndex}`) ||
-						(evaluateOnlyFirstLine && lineIndex !== 0)
-					) {
-						return undefined;
-					}
-					if (added || removed) {
-						if (!diffLines.includes(counter)) {
-							diffLines.push(counter);
-						}
-						if (removed) {
-							leftLineNumber += 1;
-							left.lineNumber = leftLineNumber;
-							left.type = DiffType.REMOVED;
-							left.value = line || ' ';
-							// When the current line is of type REMOVED, check the next item in
-							// the diff array whether it is of type ADDED. If true, the current
-							// diff will be marked as both REMOVED and ADDED. Meaning, the
-							// current line is a modification.
-							const nextDiff = diffArray[diffIndex + 1];
-							if (nextDiff && nextDiff.added) {
-								const nextDiffLines = constructLines(nextDiff.value)[lineIndex];
-								if (nextDiffLines) {
-									const {
-										value: rightValue,
-										lineNumber,
-										type,
-									} = getLineInformation(
-										nextDiff.value,
-										diffIndex,
-										true,
-										false,
-										true,
-									)[0].right;
-									// When identified as modification, push the next diff to ignore
-									// list as the next value will be added in this line computation as
-									// right and left values.
-									ignoreDiffIndexes.push(`${diffIndex + 1}-${lineIndex}`);
-									right.lineNumber = lineNumber;
-									right.type = type;
-									// Do word level diff and assign the corresponding values to the
-									// left and right diff information object.
-									if (disableWordDiff) {
-										right.value = rightValue;
-									} else {
-										const computedDiff = computeDiff(
-											line,
-											rightValue as string,
-											compareMethod,
-										);
-										right.value = computedDiff.right;
-										left.value = computedDiff.left;
-									}
-								}
+		lines.forEach((line: string, lineIndex) => {
+			const left: DiffInformation = { value: "", type: DiffType.DEFAULT };
+			const right: DiffInformation = { value: "", type: DiffType.DEFAULT };
+			if (
+				ignoreDiffIndexes.includes(`${diffIndex}-${lineIndex}`) ||
+				(evaluateOnlyFirstLine && lineIndex !== 0)
+			) {
+				return;
+			}
+
+			if (added || removed) {
+				if (!diffLines.includes(counter)) {
+					diffLines.push(counter);
+				}
+				if (removed) {
+					leftLineNumber += 1;
+					left.lineNumber = leftLineNumber;
+					left.type = DiffType.REMOVED;
+					left.value = line || ' ';
+					// When the current line is of type REMOVED, check the next item in
+					// the diff array whether it is of type ADDED. If true, the current
+					// diff will be marked as both REMOVED and ADDED. Meaning, the
+					// current line is a modification.
+					const nextDiff = diffArray[diffIndex + 1];
+					if (nextDiff && nextDiff.added) {
+						const nextDiffLines = constructLines(nextDiff.value)[lineIndex];
+						if (nextDiffLines) {
+							const {
+								value: rightValue,
+								lineNumber,
+								type,
+							} = getLineInformation(
+								nextDiff.value,
+								diffIndex,
+								true,
+								false,
+								true,
+							)[0].right;
+							// When identified as modification, push the next diff to ignore
+							// list as the next value will be added in this line computation as
+							// right and left values.
+							ignoreDiffIndexes.push(`${diffIndex + 1}-${lineIndex}`);
+							right.lineNumber = lineNumber;
+							right.type = type;
+							// Do word level diff and assign the corresponding values to the
+							// left and right diff information object.
+							if (disableWordDiff) {
+								right.value = rightValue;
+							} else {
+								const computedDiff = computeDiff(
+									line,
+									rightValue as string,
+									compareMethod,
+								);
+								right.value = computedDiff.right;
+								left.value = computedDiff.left;
 							}
-						} else {
-							rightLineNumber += 1;
-							right.lineNumber = rightLineNumber;
-							right.type = DiffType.ADDED;
-							right.value = line;
 						}
-					} else {
-						leftLineNumber += 1;
-						rightLineNumber += 1;
-
-						left.lineNumber = leftLineNumber;
-						left.type = DiffType.DEFAULT;
-						left.value = line;
-						right.lineNumber = rightLineNumber;
-						right.type = DiffType.DEFAULT;
-						right.value = line;
 					}
+				} else {
+					rightLineNumber += 1;
+					right.lineNumber = rightLineNumber;
+					right.type = DiffType.ADDED;
+					right.value = line;
+				}
+			} else {
+				leftLineNumber += 1;
+				rightLineNumber += 1;
 
-					counter += 1;
-					return { right, left };
-				},
-			)
-			.filter(Boolean);
+				left.lineNumber = leftLineNumber;
+				left.type = DiffType.DEFAULT;
+				left.value = line;
+				right.lineNumber = rightLineNumber;
+				right.type = DiffType.DEFAULT;
+				right.value = line;
+			}
+
+			counter += 1;
+			linesInfo.push({ right, left });
+		},
+		);
+		return linesInfo;
 	};
 
 	diffArray.forEach(({ added, removed, value }: diff.Change, index): void => {
